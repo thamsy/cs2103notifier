@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"cs2103notifier/constants"
 	"cs2103notifier/secret"
+	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
 	"time"
 )
 
@@ -26,11 +29,24 @@ func init() {
 func main() {
 	postSlack(constants.START_MESSAGE)
 	defer postSlack(constants.END_MESSAGE)
+	setUpLog()
+	var counter = 0
 	for true {
+		counter++
+		fmt.Println("Iteration: " + strconv.Itoa(counter))
 		getCurrentWebsite()
 		compareForUpdates()
-		time.Sleep(5 * time.Second)
+		time.Sleep(30 * time.Minute)
 	}
+}
+
+func setUpLog() {
+	f, err := os.OpenFile(constants.GetLogDir(), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		fmt.Println(err)
+	}
+	log.SetOutput(f)
+	log.Println("Log starting...")
 }
 
 func postSlack(msg string) error {
@@ -41,34 +57,34 @@ func postSlack(msg string) error {
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{}
 	resp, err := client.Do(req)
-	defer resp.Body.Close()
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 	return nil
 }
 
 func getCurrentWebsite() error {
+
 	for _, filename := range secret.Cs2103Subfiles {
 		// Get Current Website State
 		resp, err := http.Get(secret.Cs2103Website + filename)
-		defer resp.Body.Close()
 		if err != nil {
 			postSlack(err.Error())
-			panic(err)
 		}
+		defer resp.Body.Close()
 
 		// Write into file
 		out, err := os.OpenFile(constants.GetCurrentDir(filename), os.O_WRONLY, 0666)
-		defer out.Close()
 		if err != nil {
 			postSlack(err.Error())
-			panic(err)
+			//panic(err)
 		}
+		defer out.Close()
 		_, err = io.Copy(out, resp.Body)
 		if err != nil {
 			postSlack(err.Error())
-			panic(err)
+			//panic(err)
 		}
 	}
 	return nil
@@ -82,10 +98,11 @@ func compareForUpdates() {
 
 		// Post to Slack if there is diff, and copy current.txt to prev.txt
 		if len(output) != 0 {
+			log.Println(filename + " changed at" + time.Now().String() + ":\n" + string(output))
 			if len(output) < 200 {
 				postSlack("*File Changed: " + filename + "*\n" + string(output))
 			} else {
-				postSlack("File Changed: " + filename)
+				postSlack("*File Changed: " + filename + "*")
 			}
 			curr, _ := os.Open(constants.GetCurrentDir(filename))
 			prev, _ := os.Create(constants.GetPrevDir(filename))
@@ -94,7 +111,7 @@ func compareForUpdates() {
 			_, err := io.Copy(prev, curr)
 			if err != nil {
 				postSlack(err.Error())
-				panic(err)
+				//panic(err)
 			}
 		}
 	}
