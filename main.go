@@ -37,6 +37,9 @@ func main() {
 		getCurrentWebsite()
 		compareForUpdates()
 		time.Sleep(30 * time.Minute)
+		if r := recover(); r != nil {
+			log.Println("Recover")
+		}
 	}
 }
 
