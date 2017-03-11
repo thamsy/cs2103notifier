@@ -10,10 +10,20 @@ import (
 	"time"
 )
 
-func main() {
-	slack.SendMsg(constants.START_MESSAGE)
-	defer slack.SendMsg(constants.END_MESSAGE)
+func init() {
 	initialize()
+	slack.SendMsg(constants.START_MESSAGE)
+}
+
+func main() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("Recover")
+			main()
+		}
+		slack.SendMsg(constants.END_MESSAGE)
+	}()
+
 	var counter = 0
 	for true {
 		counter++
@@ -21,8 +31,5 @@ func main() {
 		website.GetCurrentWebsite()
 		website.CompareForUpdates()
 		time.Sleep(30 * time.Minute)
-		if r := recover(); r != nil {
-			log.Println("Recover")
-		}
 	}
 }
